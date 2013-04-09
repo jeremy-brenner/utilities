@@ -13,8 +13,6 @@ services = {
   }   
 }        
 
-
-
 class Services
   def initialize ( services={} )
     @services=services
@@ -50,6 +48,10 @@ class Services
     print "Process running at pids: #{pids.join(", ")}.\n"
     pids 
   end
+  def running? ( service_name )
+    pids = self.getPids( service_name )
+    pids.length > 0
+  end 
   def getPids ( service_name )
     `pgrep -f '#{ @services[service_name.to_sym][:start] }'`.split("\n")
   end
