@@ -24,7 +24,7 @@ class Services
     self.status( service_name )
   end
   def stop ( service_name )
-    pids = self.status( service_name ) 
+    pids = self.status( service_name ) || []
     return if pids.length == 0
     pids.each do |pid|
       print "Killing #{pid}...\n"
@@ -32,7 +32,7 @@ class Services
     end
   end
   def reload ( service_name )
-    pids = self.status( service_name ) 
+    pids = self.status( service_name ) || []
     return if pids.length == 0
     pids.each do |pid|
       print "Reloading #{pid}...\n"
