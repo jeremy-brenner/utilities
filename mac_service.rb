@@ -10,7 +10,11 @@ services = {
     start: "/usr/local/opt/nginx/sbin/nginx",
     stop: "kill -QUIT %s",
     reload: "kill -HUP %s" 
-  }   
+  },   
+  redis: {
+    start: "redis-server /usr/local/etc/redis.conf",
+    stop: "kill %s"
+  }
 }        
 
 class Services
