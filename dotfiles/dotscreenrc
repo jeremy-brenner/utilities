@@ -1,0 +1,3 @@
+hardstatus alwayslastline "%?%{mk}[%{gk}%m/%d %C%a%{mk}][%{Bk}%?%-w%{rk}{%{Bk}%{ck}%n %t%{rk}}%{Bk}%+w%{mk}%=]%?%?[%{gk}%H%{Bk}:%{rk} %l%{mk}]"
+vbell off
+shell -${SHELL}
