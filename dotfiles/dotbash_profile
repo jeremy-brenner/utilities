@@ -25,7 +25,7 @@ PS1='\u@\h:\w\$ '
 [[ -s ~/.rvm/scripts/rvm ]] && source ~/.rvm/scripts/rvm
 
 
-if [[ -e ${SSH_AGENT_PID} ]]; then
+if [[ -z ${SSH_AGENT_PID} ]]; then
   eval `ssh-agent -s`  
   ssh-add 
 fi
