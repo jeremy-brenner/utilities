@@ -1,35 +1,52 @@
 #!/bin/bash
 
+### Functions
+
 set_term_title(){
-   echo -en "\033]0;$1\a"
+   echo -en "\033]0;${1}\a"
 }
 
 automount(){
-  if [[ -e ${mntdir} ]]; then
-    for mnt in `ls ${mntdir}`; do
-      mount ${mntdir}/${mnt} >/dev/null 2>&1
+  if [[ -e ${1} ]]; then
+    for mnt in `ls ${1}`; do
+      mount ${1}/${mnt} >/dev/null 2>&1
     done
   fi
 }
 
-mntdir='/mnt/sshfs/'
+ssh_agent(){
+  if [[ -z ${SSH_AGENT_PID} ]]; then
+    eval `ssh-agent -s`  
+    ssh-add 
+  fi
+}
 
-set_term_title `hostname`
+rvm_load(){
+  # Load RVM into a shell session *as a function*
+  [[ -s "/usr/local/rvm/scripts/rvm" ]] && source "/usr/local/rvm/scripts/rvm" 
+  [[ -s ~/.rvm/scripts/rvm ]] && source ~/.rvm/scripts/rvm
+}
 
-automount
+set_promp(){
+  PS1='\u@\h:\w\$ '
+}
 
-PS1='\u@\h:\w\$ '
+brew_path(){
+  if [[ -x /usr/local/bin/brew ]]; then
+    PATH="/usr/local/sbin:${PATH}"
+  fi
+}
 
-# Load RVM into a shell session *as a function*
-[[ -s "/usr/local/rvm/scripts/rvm" ]] && source "/usr/local/rvm/scripts/rvm" 
-[[ -s ~/.rvm/scripts/rvm ]] && source ~/.rvm/scripts/rvm
+### Variables
 
+mount_dir='/mnt/sshfs/'
+term_tile=`hostname`
 
-if [[ -z ${SSH_AGENT_PID} ]]; then
-  eval `ssh-agent -s`  
-  ssh-add 
-fi
+### Execution
 
-if [[ -x /usr/local/bin/brew ]]; then
-  PATH="/usr/local/sbin:${PATH}"
-fi
+set_term_title ${term_title}
+automount ${mount_dir}
+set_prompt
+rvm_load
+ssh_agent
+brew_path
