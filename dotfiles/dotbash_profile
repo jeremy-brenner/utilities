@@ -27,7 +27,7 @@ rvm_load(){
   [[ -s ~/.rvm/scripts/rvm ]] && source ~/.rvm/scripts/rvm
 }
 
-set_promp(){
+set_prompt(){
   PS1='\u@\h:\w\$ '
 }
 
