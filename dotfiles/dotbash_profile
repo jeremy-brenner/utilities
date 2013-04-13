@@ -40,13 +40,13 @@ brew_path(){
 ### Variables
 
 mount_dir='/mnt/sshfs/'
-term_tile=`hostname`
+term_title=`hostname`
 
 ### Execution
 
 set_term_title ${term_title}
 automount ${mount_dir}
-set_prompt
+set_prompt 
 rvm_load
 ssh_agent
 brew_path
