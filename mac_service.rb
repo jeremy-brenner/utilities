@@ -1,30 +1,26 @@
 #!/usr/bin/env ruby
 
+require 'yaml'
 
-services = {
-  postgres: {
-    start: "/usr/local/opt/postgresql/bin/postgres -D /usr/local/var/postgres -r /usr/local/var/postgres/server.log",
-    stop: "kill -INT %s"
-  },
-  nginx: {
-    start: "/usr/local/opt/nginx/sbin/nginx",
-    stop: "kill -QUIT %s",
-    reload: "kill -HUP %s" 
-  },   
-  redis: {
-    start: "redis-server /usr/local/etc/redis.conf",
-    stop: "kill %s"
-  }
-}        
+script_location = File.dirname(__FILE__)
+config_name = 'mac_service.yml'
+services = YAML.load_file( File.join( script_location, config_name ) )
 
 class Services
   def initialize ( services={} )
     @services=services
   end
+  def get_cmd( action, service_name )
+    print "#{service_name} not defined" unless service_name
+    print "#{action} not defined for #{service_name}" unless action
+    ( @services[service_name]["sudo"] ? "sudo ": "" ) + "#{ @services[service_name][action] } >/dev/null 2>&1 &"
+  end
   def start ( service_name )
     return if self.status( service_name )
     print "Starting #{service_name}\n"
-    `#{ @services[service_name.to_sym][:start] } >/dev/null 2>&1 &`
+    if cmd = get_cmd( "start", service_name )
+      `#{cmd}` 
+    end
     self.status( service_name )
   end
   def stop ( service_name )
@@ -32,7 +28,9 @@ class Services
     return if pids.length == 0
     pids.each do |pid|
       print "Killing #{pid}...\n"
-      `#{ @services[service_name.to_sym][:stop] % pid }`
+      if cmd = get_cmd( "stop", service_name )
+        `#{cmd % pid}`     
+      end
     end
   end
   def reload ( service_name )
@@ -40,11 +38,17 @@ class Services
     return if pids.length == 0
     pids.each do |pid|
       print "Reloading #{pid}...\n"
-      `#{ @services[service_name.to_sym][:reload] % pid }`
+      if cmd = get_cmd( "reload", service_name )
+        `#{cmd % pid}` 
+      end
     end
   end
   def list ( service_name = '' )
-    print "Available services: #{ @services.keys.join(", ") }\n"
+    print "Services:\n"
+    @services.keys.each do |service_name|
+      print "  #{service_name} - "
+      status( service_name )      
+    end
   end
   def status ( service_name )
     pids = self.getPids( service_name ) 
@@ -57,10 +61,13 @@ class Services
     pids.length > 0
   end 
   def getPids ( service_name )
-    `pgrep -f '#{ @services[service_name.to_sym][:start] }'`.split("\n")
+    `pgrep -f '#{ @services[service_name]["start"] }'`.split("\n") 
   end
 end
 
 service = Services.new( services )
 
-service.send( ARGV[0], ARGV[1] )
+action = ARGV[0] || 'list'
+service_name = ARGV[1] || ''
+
+service.send( action, service_name )
