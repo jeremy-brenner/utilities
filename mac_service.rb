@@ -3,19 +3,23 @@
 require 'yaml'
 
 class Services
-  def initialize ( services={} )
-    @script_location = File.dirname(__FILE__)
-    @config_name = 'mac_service.yml'
-    @services = YAML.load_file( File.join( @script_location, @config_name ) )    
+  def initialize ( config_file = nil )
+    @config_file = !config_file ? File.join( File.dirname(__FILE__), 'mac_service.yml' )  : config_file
+    read_service_defs
+    load_services
   end
-  def do( args )
-    service_name, action = parse_args( args )
-    if !action 
-      print "Invalid arguments\n"
-    else
-      send(action,service_name)
-    end
+
+  def read_service_defs
+    @service_defs = YAML.load_file( @config_file ) 
   end
+
+  def load_services
+    @services = {}
+    @service_defs.each do |service,service_def|
+      @services[service] = Service.new( service, service_def, self )
+    end 
+  end
+
   def parse_args( args )
     service_name = nil
     action = nil
@@ -29,86 +33,118 @@ class Services
           action = ARGV[0]
         end
       when 2
-        if has_action?( ARGV[0], ARGV[1] )
+        if has_service_and_action?( ARGV[0], ARGV[1] )
           service_name, action = ARGV
         end
-        if has_action?( ARGV[1], ARGV[0] )
+        if has_service_and_action?( ARGV[1], ARGV[0] )
           service_name, action = ARGV.reverse
         end
     end 
     [ service_name, action ] 
   end
-  def get_cmd( action, service_name )
-    print "#{service_name} not defined" unless service_name
-    print "#{action} not defined for #{service_name}" unless action
-    ( @services[service_name]["sudo"] ? "sudo ": "" ) + "#{ @services[service_name][action] } >/dev/null 2>&1 &"
-  end
-  def start ( service_name )
-    return if self.status( service_name )
-    print "Starting #{service_name}\n"
-    if cmd = get_cmd( "start", service_name )
-      `#{cmd}` 
-    end
-    self.status( service_name )
-  end
-  def stop ( service_name )
-    pids = self.status( service_name ) || []
-    return if pids.length == 0
-    pids.each do |pid|
-      print "Killing #{pid}...\n"
-      if cmd = get_cmd( "stop", service_name )
-        `#{cmd % pid}`     
-      end
+
+  def do( args )
+    service_name, action = parse_args( args )
+    return send(action,service_name) if respond_to? action.to_s
+    if service(service_name).respond_to? action.to_s
+      service(service_name).send(action) 
+      print_status(service_name)
+    else
+      return "Invalid arguments\n"
     end
   end
-  def reload ( service_name )
-    pids = self.status( service_name ) || []
-    return if pids.length == 0
-    pids.each do |pid|
-      print "Reloading #{pid}...\n"
-      if cmd = get_cmd( "reload", service_name )
-        `#{cmd % pid}` 
-      end
-    end
+
+  def has_service_and_action? ( service_name, action )
+    has_service?(service_name) && service(service_name).has_action?(action)
   end
+
+  def service ( service_name )
+    @services[service_name]
+  end
+
+  def actions
+    [ 'list', 'status' ]
+  end
+
   def list ( service_name = nil )
-    service_name ? list_actions(service_name) : list_services
+    service_name ? print_actions(service_name) : print_services
   end
-  def list_services
+
+  def print_services
     print "Services:\n"
     @services.keys.each do |service_name|
       print "  #{service_name} - "
-      status( service_name )      
+      print_status( service_name )      
     end
   end
-  def list_actions ( service_name )
-    print "Available actions for #{service_name} are: #{ actions(service_name).join(", ") }\n"
-    print "#{service_name} needs sudo to run.\n" if uses_sudo?(service_name)
+
+  def print_actions ( service_name )
+    s = service(service_name)
+    print "Available actions for #{service_name} are: #{ s.actions.join(", ") }\n"
+    print "#{service_name} needs sudo to run.\n" if s.uses_sudo?
   end
-  def actions ( service_name )
-    [ 'list' ] + @services[service_name].keys.select { |k| k != 'sudo' }
+
+  def print_status ( service_name )
+    s = service(service_name)
+    return print "Process not running.\n" unless s.running?
+    print "Process running at pids: #{s.pids.join(", ")}.\n"
   end
-  def has_action? ( service_name, action )
-    has_service?(service_name) && actions(service_name).include?(action)
-  end
-  def uses_sudo? ( service_name )
-    @services[service_name].has_key? 'sudo'
-  end
-  def status ( service_name )
-    pids = self.get_pids( service_name ) 
-    return print "Process not running.\n" unless pids.length > 0
-    print "Process running at pids: #{pids.join(", ")}.\n"
-    pids 
-  end
-  def running? ( service_name )
-    pids = self.get_pids( service_name )
-    pids.length > 0
-  end 
-  def get_pids ( service_name )
-    `pgrep -f '#{ @services[service_name]["start"] }'`.split("\n") 
-  end
+  
+  alias_method :status, :print_status
+
   def has_service? ( service_name )
     @services.has_key? service_name
+  end
+end
+
+class Service
+  def initialize( name, actions, parent )
+    @name = name
+    @actions = actions
+    @parent = parent
+  end
+
+  def actions 
+    @parent.actions + @actions.keys.select { |k| k != 'sudo' }
+  end
+
+  def uses_sudo?
+    @actions.has_key? 'sudo'
+  end
+  def has_action? ( action )
+    actions.include?(action)
+  end
+  def pids 
+    `pgrep -f '#{ @actions["start"] }'`.split("\n") 
+  end
+  def running?
+    pids.length > 0
+  end 
+  def run_cmd  ( action, *args )
+    return unless has_action? action
+    cmd = ( uses_sudo? ? "sudo ": "" ) + "#{ @actions[action] } >/dev/null 2>&1 &"
+    if args.length > 0
+      `#{cmd % args}` 
+    else
+      `#{cmd}` 
+    end
+  end
+  def start
+    return print "Already running\n" if running?
+    print "Starting #{@name}...\n"
+    run_cmd("start")
+  end
+  def stop 
+    pids.each do |pid|
+      print "Killing #{pid}...\n"
+      run_cmd("stop", pid)
+    end
+  end
+  def reload 
+    pids.each do |pid|
+      print "Reloading #{pid}...\n"
+      run_cmd("reload", pid)
+    end
   end
 end
 
