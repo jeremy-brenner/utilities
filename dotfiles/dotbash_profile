@@ -37,10 +37,28 @@ brew_path(){
   fi
 }
 
+project_dir(){
+  if [ -z ${1} ]; then
+    doing="nothing"
+  elif [ ${1} == "local" ]; then
+    eval "rm ${projects_dir}"
+    eval "ln -sf ${local_projects_dir} ${projects_dir}"
+  elif [ ${1} == "remote" ]; then
+    eval "rm ${projects_dir}"
+    eval "ln -sf ${remote_projects_dir} ${projects_dir}"
+  else
+    echo "Unknown project location: ${1}"
+  fi
+  eval "ls -ld ${projects_dir}"
+}
+
 ### Variables
 
 mount_dir='/mnt/sshfs/'
 term_title=`hostname`
+projects_dir="~/projects"
+local_projects_dir="~/local_projects"
+remote_projects_dir="~/remote_projects"
 
 ### Execution
 
@@ -50,3 +68,5 @@ set_prompt
 rvm_load
 ssh_agent
 brew_path
+
+
