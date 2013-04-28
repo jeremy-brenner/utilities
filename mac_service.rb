@@ -45,12 +45,11 @@ class Services
 
   def do( args )
     service_name, action = parse_args( args )
+    return print "Invalid arguments\n" if service_name.nil? and action.nil?
     return send(action,service_name) if respond_to? action.to_s
     if service(service_name).respond_to? action.to_s
       service(service_name).send(action) 
       print_status(service_name)
-    else
-      return "Invalid arguments\n"
     end
   end
 
@@ -105,21 +104,33 @@ class Service
   end
 
   def actions 
-    @parent.actions + @actions.keys.select { |k| k != 'sudo' }
+    @parent.actions + my_actions
   end
 
   def uses_sudo?
     @actions.has_key? 'sudo'
   end
+
   def has_action? ( action )
     actions.include?(action)
   end
+
+  def my_actions 
+    @actions.keys.select { |k| k != 'sudo' } + ( can_restart? ? ['restart'] : [] )
+  end
+
+  def can_restart? 
+    @actions.keys.include?('stop') && @actions.keys.include?('start')
+  end
+
   def pids 
     `pgrep -f '#{ @actions["start"] }'`.split("\n") 
   end
+
   def running?
     pids.length > 0
   end 
+
   def run_cmd  ( action, *args )
     return unless has_action? action
     cmd = ( uses_sudo? ? "sudo ": "" ) + "#{ @actions[action] } >/dev/null 2>&1 &"
@@ -129,22 +140,30 @@ class Service
       `#{cmd}` 
     end
   end
+
   def start
     return print "Already running\n" if running?
     print "Starting #{@name}...\n"
     run_cmd("start")
   end
+
   def stop 
     pids.each do |pid|
       print "Killing #{pid}...\n"
       run_cmd("stop", pid)
     end
   end
+
   def reload 
     pids.each do |pid|
       print "Reloading #{pid}...\n"
       run_cmd("reload", pid)
     end
+  end
+
+  def restart
+    stop
+    start
   end
 end
 
