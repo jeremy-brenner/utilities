@@ -62,7 +62,7 @@ class Services
   end
 
   def actions
-    [ 'list', 'status' ]
+    %w[ list status ]
   end
 
   def list ( service_name = nil )
@@ -116,7 +116,7 @@ class Service
   end
 
   def my_actions 
-    @actions.keys.select { |k| k != 'sudo' } + ( can_restart? ? ['restart'] : [] )
+    @actions.keys - ['sudo'] + ( can_restart? ? ['restart'] : [] )
   end
 
   def can_restart? 
